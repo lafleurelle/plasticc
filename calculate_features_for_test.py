@@ -71,7 +71,6 @@ with open(lcfilename_test, "r") as csvfile:
                             results = pool.imap(worker, list(tsdict_test.values()))
                             for res in results:
                                 features_list.append(res)
-                        #featuretable = featurize.assemble_featureset(features_list=features_list,time_series=tsdict_test.values())
                         tsdict_test.clear()
                         del results
                         gc.collect()
