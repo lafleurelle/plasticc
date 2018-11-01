@@ -1,14 +1,9 @@
-import os
 from collections import OrderedDict
-import numpy as np
 import matplotlib.pyplot as plt
 from astropy.table import Table
 import multiprocessing
 from cesium.time_series import TimeSeries
 import cesium.featurize as featurize
-from tqdm import tnrange, tqdm_notebook
-import sklearn 
-import pandas as pd
 import warnings
 warnings.simplefilter('ignore')
 import csv
