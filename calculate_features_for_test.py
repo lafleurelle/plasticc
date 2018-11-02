@@ -8,6 +8,7 @@ import warnings
 warnings.simplefilter('ignore')
 import csv
 import gc
+import numpy as np
 
 def worker(tsobj):
     global features_to_use
@@ -17,9 +18,20 @@ def worker(tsobj):
     return thisfeats
 
 pbmap = OrderedDict([(0,'u'), (1,'g'), (2,'r'), (3,'i'), (4, 'z'), (5, 'Y')])
-pbcols = OrderedDict([(0,'blueviolet'), (1,'green'), (2,'red'),\
-                      (3,'orange'), (4, 'black'), (5, 'brown')])
-pbnames = list(pbmap.values())
+
+def pooler(tsdict, func, features_list):
+    with multiprocessing.Pool() as pool:  
+        results = pool.imap(func, list(tsdict.values()))
+        for res in results:
+            features_list.append(res)
+        del results, res, 
+    return features_list
+
+def init_list_of_objects(size):
+    list_of_objects = list()
+    for i in range(0,size):
+        list_of_objects.append([])
+    return list_of_objects
 
 features_to_use = ["amplitude",
                    "percent_beyond_1_std",
@@ -37,44 +49,63 @@ lcfilename_test = '../input/PLAsTiCC-2018/test_set.csv'
 
 tsdict_test = OrderedDict()
 
+
+tsdict_test = OrderedDict()
 with open(lcfilename_test, "r") as csvfile:
     datareader = csv.reader(csvfile)
-    timeserie = []
     object_num = 0
     features_list = []
+    rows_count=0
+    t=init_list_of_objects(6)
+    m=init_list_of_objects(6)
+    e=init_list_of_objects(6)
     for row in datareader:
-        if timeserie==[]:
+        if rows_count==0:
+            names=row
+            rows_count+=1
+        elif rows_count==1:
             object_num = row[0]
-            timeserie.append(row)
+            for pb in range(6):
+                if int(row[2])==pb:
+                    t[pb].append(float(row[1]))
+                    m[pb].append(float(row[3]))
+                    e[pb].append(float(row[4]))
+            rows_count+=1
         else:
             if row[0]==object_num:
-               timeserie.append(row)
+                rows_count+=1
+                for pb in range(6):
+                    if int(row[2])==pb:
+                        t[pb].append(float(row[1]))
+                        m[pb].append(float(row[3]))
+                        e[pb].append(float(row[4]))
             else:
-                if object_num!='object_id':
-                    test_table=Table(rows=timeserie, names=['object_id', 'mjd', 'passband', 'flux', 'flux_err', 'detected'],\
-                                    dtype=['i8', 'f8', 'i4', 'f8', 'f8', 'b'])
-                    pbind = [(test_table['passband'] == pb) for pb in pbmap]
-                    thisid=test_table['object_id'][0]
-                    t = [test_table['mjd'][mask].data for mask in pbind ]
-                    m = [test_table['flux'][mask].data for mask in pbind ]
-                    e = [test_table['flux_err'][mask].data for mask in pbind ]
-                    tsdict_test[thisid] = TimeSeries(t=t, m=m, e=e,\
-                                                     name=thisid)
-                    if len(tsdict_test.values())>200000:
-                        print (200000)
-                        with multiprocessing.Pool() as pool:  
-                            results = pool.imap(worker, list(tsdict_test.values()))
-                            for res in results:
-                                features_list.append(res)
-                        tsdict_test.clear()
-                        del results
-                        gc.collect()
-                timeserie=[]
-                timeserie.append(row)
+                rows_count+=1
+                t1=[np.array(i) for i in t]
+                m1=[np.array(i) for i in m]
+                e1=[np.array(i) for i in e]
+                thisid=int(object_num)
+                tsdict_test[thisid] = TimeSeries(t=t1, m=m1, e=e1,name=thisid)
+                if len(tsdict_test.values())>99999:
+                    print (100000)
+                    features_list=pooler(tsdict_test, worker, features_list)
+                    tsdict_test.clear()
+                    gc.collect()
+                del t[:], m[:], e[:], t, m, e
+                t=init_list_of_objects(6)
+                m=init_list_of_objects(6)
+                e=init_list_of_objects(6)
                 object_num = row[0]
+                for pb in range(6):
+                    if int(row[2])==pb:
+                        t[pb].append(float(row[1]))
+                        m[pb].append(float(row[3]))
+                        e[pb].append(float(row[4]))
+
+print (len(tsdict_test.values()))
+end=time.time()
+print (end-start)
 if len(tsdict_test.values())>0:
-    with multiprocessing.Pool() as pool:  
-        results = pool.imap(worker, list(tsdict_test.values()))
-        for res in results:
-            features_list.append(res)
+    features_list=pooler(tsdict_test, worker, features_list)
     tsdict_test.clear()
+    gc.collect()     
