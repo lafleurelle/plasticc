@@ -9,6 +9,7 @@ warnings.simplefilter('ignore')
 import csv
 import gc
 import numpy as np
+import pandas as pd
 
 def worker(tsobj):
     global features_to_use
@@ -19,7 +20,7 @@ def worker(tsobj):
 
 pbmap = OrderedDict([(0,'u'), (1,'g'), (2,'r'), (3,'i'), (4, 'z'), (5, 'Y')])
 
-def pooler(tsdict, func, features_list):
+def pooler(tsdict, func):
     with multiprocessing.Pool() as pool:  
         results = pool.imap(func, list(tsdict.values()))
         for res in results:
@@ -47,8 +48,6 @@ features_to_use = ["amplitude",
                    
 lcfilename_test = '../input/PLAsTiCC-2018/test_set.csv'
 
-tsdict_test = OrderedDict()
-
 
 tsdict_test = OrderedDict()
 with open(lcfilename_test, "r") as csvfile:
@@ -59,6 +58,8 @@ with open(lcfilename_test, "r") as csvfile:
     t=init_list_of_objects(6)
     m=init_list_of_objects(6)
     e=init_list_of_objects(6)
+    objects_list=[]
+    total_feats=pd.DataFrame()
     for row in datareader:
         if rows_count==0:
             names=row
@@ -85,27 +86,34 @@ with open(lcfilename_test, "r") as csvfile:
                 m1=[np.array(i) for i in m]
                 e1=[np.array(i) for i in e]
                 thisid=int(object_num)
+                objects_list.append(thisid)
                 tsdict_test[thisid] = TimeSeries(t=t1, m=m1, e=e1,name=thisid)
-                if len(tsdict_test.values())>99999:
-                    print (100000)
-                    features_list=pooler(tsdict_test, worker, features_list)
-                    tsdict_test.clear()
+                
+                if len(tsdict_test.values())%100000==0:
+
+                    features_list=pooler(tsdict_test, worker)
+                    featuretable = featurize.assemble_featureset(features_list=features_list,\
+                                                  time_series=tsdict_test.values())
+                    total_feats=pd.concat([total_feats, featuretable], axis=0)
+                    tsdict_test=OrderedDict()
+                    features_list=[]
                     gc.collect()
+
                 del t[:], m[:], e[:], t, m, e
+                
                 t=init_list_of_objects(6)
                 m=init_list_of_objects(6)
                 e=init_list_of_objects(6)
                 object_num = row[0]
+                
                 for pb in range(6):
                     if int(row[2])==pb:
                         t[pb].append(float(row[1]))
                         m[pb].append(float(row[3]))
                         e[pb].append(float(row[4]))
-
-print (len(tsdict_test.values()))
-end=time.time()
-print (end-start)
 if len(tsdict_test.values())>0:
-    features_list=pooler(tsdict_test, worker, features_list)
-    tsdict_test.clear()
-    gc.collect()     
+    features_list=pooler(tsdict_test, worker)
+    featuretable = featurize.assemble_featureset(features_list=features_list,\
+                                                  time_series=tsdict_test.values())
+    total_feats=pd.concat([total_feats, featuretable], axis=0)
+
