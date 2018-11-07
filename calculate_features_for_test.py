@@ -33,14 +33,9 @@ def pooler(total_feats, tsdict, func):
     return total_feats
 
 def init_list_of_objects(size):
-    t = list()
-    m = list()
-    e = list()
-    for i in range(0,size):
-        t.append([])
-        m.append([])
-        e.append([])
-    return t, m, e
+    t = [[] for i in range(size)]
+    m = [[] for i in range(size)]
+    e = [[] for i in range(size)]
 
 def parse_timeserie(row, num_passbands, t, m, e):
     for pb in range(num_passbands):
